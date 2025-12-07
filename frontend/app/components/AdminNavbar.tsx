@@ -75,6 +75,16 @@ export default function AdminNavbar() {
             >
               Manage Orders
             </Link>
+            <Link 
+              href="/reports" 
+              className={`font-medium text-sm uppercase tracking-wider transition-colors px-4 py-2 rounded ${
+                isActive("/reports")
+                  ? "bg-luxury-dark text-white"
+                  : "text-luxury-dark hover:text-luxury-gold hover:bg-gray-50"
+              }`}
+            >
+              Reports
+            </Link>
             {token && (
               <button 
                 onClick={handleLogout} 
