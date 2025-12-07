@@ -17,47 +17,102 @@ function decodeIsAdmin() {
 
 export default function ReportsPage() {
   const router = useRouter();
-  const [loading, setLoading] = useState(true);
+  const [mounted, setMounted] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  const [loading, setLoading] = useState(false);
   const [dailyRevenue, setDailyRevenue] = useState<any[]>([]);
   const [topCustomers, setTopCustomers] = useState<any[]>([]);
   const [categorySales, setCategorySales] = useState<any[]>([]);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    const fetchReports = async () => {
-      try {
-        initAuth();
-        const isAdmin = decodeIsAdmin();
-        
-        if (!isAdmin) {
-          router.push('/admin/login');
-          return;
-        }
+    setMounted(true);
 
-        const res = await api.get('/api/reports/all');
-        setDailyRevenue(res.data.dailyRevenue || []);
-        setTopCustomers(res.data.topCustomers || []);
-        setCategorySales(res.data.categorySales || []);
-        setLoading(false);
-      } catch (err: any) {
-        console.error('Error fetching reports:', err);
-        setError(err.response?.data?.error || err.message || 'Failed to load reports');
-        setLoading(false);
-      }
-    };
+    initAuth();
+    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
 
-    fetchReports();
+    const adminStatus = decodeIsAdmin();
+    setIsAdmin(adminStatus);
+
+    if (!adminStatus) {
+      router.push("/admin/login");
+      return;
+    }
+
+    if (token) {
+      fetchReports();
+    } else {
+      router.push("/admin/login");
+    }
   }, [router]);
+
+  const fetchReports = async () => {
+    setLoading(true);
+    try {
+      const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+
+      if (!token) {
+        alert("No authentication token found. Please login again.");
+        router.push("/admin/login");
+        return;
+      }
+
+      const res = await api.get("/api/reports/all");
+
+      setDailyRevenue(res.data.dailyRevenue || []);
+      setTopCustomers(res.data.topCustomers || []);
+      setCategorySales(res.data.categorySales || []);
+    } catch (err: any) {
+      console.error("Error fetching reports:", err);
+      const msg = err.response?.data?.error || err.message || "Failed to load reports";
+      setError(msg);
+
+      if (err.response?.status === 401 || err.response?.status === 403) {
+        router.push("/admin/login");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // -------------------------------------------
+  // SAME LOADING SCREEN AS AdminOrders
+  // -------------------------------------------
+  if (!mounted) {
+    return (
+      <div className="cart-page-container">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-luxury-dark mx-auto mb-4"></div>
+            <p>Loading...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAdmin) {
+    return (
+      <div className="cart-page-container">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+          <p>Redirecting to login...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // -------------------------------------------
+  // MAIN REPORT UI (Same login flow as AdminOrders)
+  // -------------------------------------------
 
   if (loading) {
     return (
       <div className="pt-32 pb-20 min-h-screen">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-center items-center min-h-[400px]">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-luxury-dark mx-auto mb-4"></div>
-              <p className="text-luxury-gray">Loading reports...</p>
-            </div>
+          <div className="text-center py-20">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-luxury-dark mx-auto mb-4"></div>
+            <p className="text-luxury-gray">Loading reports...</p>
           </div>
         </div>
       </div>
@@ -93,24 +148,35 @@ export default function ReportsPage() {
         {/* Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <div className="bg-white rounded-lg shadow-md p-6">
-            <h3 className="text-gray-500 text-sm font-medium mb-2">Total Revenue (30 days)</h3>
-            <p className="text-3xl font-bold text-luxury-dark">${totalRevenue.toFixed(2)}</p>
+            <h3 className="text-gray-500 text-sm font-medium mb-2">
+              Total Revenue (30 days)
+            </h3>
+            <p className="text-3xl font-bold text-luxury-dark">
+              ₹{totalRevenue.toFixed(2)}
+            </p>
           </div>
+
           <div className="bg-white rounded-lg shadow-md p-6">
-            <h3 className="text-gray-500 text-sm font-medium mb-2">Total Orders (30 days)</h3>
+            <h3 className="text-gray-500 text-sm font-medium mb-2">
+              Total Orders (30 days)
+            </h3>
             <p className="text-3xl font-bold text-luxury-dark">{totalOrders}</p>
           </div>
+
           <div className="bg-white rounded-lg shadow-md p-6">
             <h3 className="text-gray-500 text-sm font-medium mb-2">Average Order Value</h3>
             <p className="text-3xl font-bold text-luxury-dark">
-              ${totalOrders > 0 ? (totalRevenue / totalOrders).toFixed(2) : '0.00'}
+              ₹{totalOrders > 0 ? (totalRevenue / totalOrders).toFixed(2) : "0.00"}
             </p>
           </div>
         </div>
 
-        {/* Daily Revenue */}
+        {/* Daily Revenue Table */}
         <div className="bg-white rounded-lg shadow-md p-6 mb-8">
-          <h2 className="text-2xl font-bold text-luxury-dark mb-4">Daily Revenue (Last 30 Days)</h2>
+          <h2 className="text-2xl font-bold text-luxury-dark mb-4">
+            Daily Revenue (Last 30 Days)
+          </h2>
+
           {dailyRevenue.length > 0 ? (
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
@@ -137,13 +203,13 @@ export default function ReportsPage() {
                         {day.date}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        ${day.totalRevenue.toFixed(2)}
+                        ₹{day.totalRevenue.toFixed(2)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         {day.orderCount}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        ${day.averageOrderValue.toFixed(2)}
+                        ₹{day.averageOrderValue.toFixed(2)}
                       </td>
                     </tr>
                   ))}
@@ -157,7 +223,8 @@ export default function ReportsPage() {
 
         {/* Top Customers */}
         <div className="bg-white rounded-lg shadow-md p-6 mb-8">
-          <h2 className="text-2xl font-bold text-luxury-dark mb-4">Top 10 Customers</h2>
+          <h2 className="text-2xl font-bold text-luxury-dark mb-4">Top Customers</h2>
+
           {topCustomers.length > 0 ? (
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
@@ -183,6 +250,7 @@ export default function ReportsPage() {
                     </th>
                   </tr>
                 </thead>
+
                 <tbody className="bg-white divide-y divide-gray-200">
                   {topCustomers.map((customer, index) => (
                     <tr key={index} className="hover:bg-gray-50">
@@ -190,19 +258,19 @@ export default function ReportsPage() {
                         #{index + 1}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {customer.userName || 'Unknown'}
+                        {customer.userName || "Unknown"}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {customer.userEmail || 'N/A'}
+                        {customer.userEmail || "N/A"}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        ${customer.totalSpent.toFixed(2)}
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        ₹{customer.totalSpent.toFixed(2)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         {customer.orderCount}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        ${customer.averageOrderValue.toFixed(2)}
+                        ₹{customer.averageOrderValue.toFixed(2)}
                       </td>
                     </tr>
                   ))}
@@ -214,9 +282,10 @@ export default function ReportsPage() {
           )}
         </div>
 
-        {/* Category-wise Sales */}
+        {/* Category Sales */}
         <div className="bg-white rounded-lg shadow-md p-6">
           <h2 className="text-2xl font-bold text-luxury-dark mb-4">Category-wise Sales</h2>
+
           {categorySales.length > 0 ? (
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
@@ -226,10 +295,10 @@ export default function ReportsPage() {
                       Category
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Total Revenue
+                      Revenue
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Total Quantity
+                      Quantity
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Orders
@@ -239,23 +308,24 @@ export default function ReportsPage() {
                     </th>
                   </tr>
                 </thead>
+
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {categorySales.map((category, index) => (
+                  {categorySales.map((cat, index) => (
                     <tr key={index} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {category.category || 'Unknown'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        ${category.totalRevenue.toFixed(2)}
+                        {cat.category || "Unknown"}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {category.totalQuantity}
+                        ₹{cat.totalRevenue.toFixed(2)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {category.orderCount}
+                        {cat.totalQuantity}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        ${category.averageItemPrice.toFixed(2)}
+                        {cat.orderCount}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        ₹{cat.averageItemPrice.toFixed(2)}
                       </td>
                     </tr>
                   ))}
