@@ -19,7 +19,7 @@ export default function AdminNavbar() {
   const handleLogout = () => {
     localStorage.removeItem("token");
     setAuthToken(null);
-    window.location.href = "/auth/login";
+    window.location.href = "/admin/login";
   };
 
   const isActive = (path: string) => {
